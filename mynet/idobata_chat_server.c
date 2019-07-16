@@ -52,6 +52,7 @@ Max_sd = max(udp_sock, tcp_sock); //Max_sd=udp_sockとtcp_sockの大きい方.
 FD_SET(udp_sock, &mask);  //UDP監視用ビットマスクの設定.
 FD_SET(tcp_sock, &mask);  //TCP監視用ビットマスクの設定.
 FD_SET(0, &mask);  //サーバーによる直接入力監視用ビットマスクの設定.
+printf("udp_sock=%d, tcp_sock=%d, Max_sd=%d\n", udp_sock, tcp_sock, Max_sd);
 
 /* このループがサーバーのメインの処理. */
 while(1){
@@ -69,6 +70,7 @@ while(1){
   if( FD_ISSET(tcp_sock, &readfds) ){
     sock_accept = Accept(tcp_sock, NULL, NULL);  //接続を待ち受ける.
     Max_sd = max(Max_sd, sock_accept);  //Max_sd < sock_acceptなら更新.
+    printf("sock=%d追加\n", sock_accept);
     append_node(sock_accept);  //ノードを追加する(usernameはまだ不明).
     continue;
   }
@@ -103,6 +105,7 @@ Branch:
 
     case JOIN:
     JOIN_process(sock_detect);  //線形リストのノードにusername情報を追加する.
+    printf("-----------");
     break;
 
     case POST:
@@ -118,10 +121,10 @@ Branch:
 
 static int max(int a,int b){
   if(a < b){
-    return a;
+    return b;
   }
   else{
-    return b;
+    return a;
   }
 }
 
@@ -134,7 +137,6 @@ static char *chop_nl(char *s)   //改行文字を消す
   }
   return(s);
 }
-
 
 /* 発言者を特定し,[username] messageの形式でパケットを作成し,文字列長を返す. */
 void create_message(int sock_detect){

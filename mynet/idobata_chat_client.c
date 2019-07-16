@@ -31,6 +31,7 @@ void idobata_chat_client(char* servername,int port_number,char *name)
 
   /* サーバに接続する */
   sock = init_tcpclient(servername,port_number);
+  printf("sock_number=%d\n", sock);
 
   printf("Hello. Welcome idobata_chat [%s].\n",name);
 
@@ -62,7 +63,7 @@ void idobata_chat_client(char* servername,int port_number,char *name)
 
 // //先頭タグの確認
 //       check_msg = analyze_header(s_buf);
-      
+
 //       if( check_msg == QUIT){
 //         //QUITメッセージをサーバに送る
 //         QUIT_msg_send(sock);
@@ -114,7 +115,7 @@ void POST_msg_send(int sock,char *s_buf){
   int strsize;
   create_packet(POST,s_buf);
   strsize = strlen(s_buf);
-  Send(sock, s_buf,strsize,0); 
+  Send(sock, s_buf,strsize,0);
 }
 
 void server_error_check(int strsize){
@@ -141,7 +142,7 @@ void POST_msg_display(char *r_buf){
 }
 
 void Input_msg(char *s_buf){
-  int Input_msg_check;  
+  int Input_msg_check;
   fgets(s_buf, S_BUFSIZE, stdin);
 }
 
@@ -152,11 +153,11 @@ void packet_check(char *msg,int sock){
 
   switch (packet_mode)
   {
-  case MESSAGE: 
+  case MESSAGE:
     MESG_msg_display(msg);
     break;
 
-  case POST: 
+  case POST:
     POST_msg_display(msg);
     break;
 
@@ -168,4 +169,3 @@ void packet_check(char *msg,int sock){
     break;
   }
 }
-

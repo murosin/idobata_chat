@@ -38,6 +38,7 @@ void POST_process(int sock_detect);
 void QUIT_process(int sock_detect);  //QUITを送られた後のプロセス
 
 void idobata_chat_server(int port_number){
+
   int udp_sock = init_udpserver(port_number); //UDPサーバー初期化.
   int tcp_sock = init_tcpserver(port_number, 5);  //TCPサーバー初期化.
   int sock_accept;  //TCP接続用.
@@ -49,6 +50,7 @@ void idobata_chat_server(int port_number){
   User_info *temp;  //探索時などに使用.作業用.
 
   Max_sd = max(udp_sock, tcp_sock); //Max_sd=udp_sockとtcp_sockの大きい方.
+  FD_ZERO(&mask);
   FD_SET(udp_sock, &mask);  //UDP監視用ビットマスクの設定.
   FD_SET(tcp_sock, &mask);  //TCP監視用ビットマスクの設定.
   FD_SET(0, &mask);  //サーバーによる直接入力監視用ビットマスクの設定.
@@ -69,48 +71,55 @@ void idobata_chat_server(int port_number){
     /* 待ち受け用TCPソケット監視. */
     if( FD_ISSET(tcp_sock, &readfds) ){
       sock_accept = Accept(tcp_sock, NULL, NULL);  //接続を待ち受ける.
+      FD_SET(sock_accept, &mask);
       Max_sd = max(Max_sd, sock_accept);  //Max_sd < sock_acceptなら更新.
       printf("sock=%d追加\n", sock_accept);
+      printf("Max_sd=%d\n", Max_sd);
       append_node(sock_accept);  //ノードを追加する(usernameはまだ不明).
+      printf("----------------1\n");
       continue;
     }
+    printf("---------------2\n");
 
     /* 接続済みTCPソケット監視. */
-    for(temp = &server; temp->next != NULL; temp=temp->next){
+    for(temp = &server; temp != NULL; temp=temp->next){
+      printf("temp->sock=%d\n", temp->sock);
       if( FD_ISSET(temp->sock, &readfds) ){
         sock_detect = temp->sock; //検出したソケット番号を保存.
         Recv(sock_detect, r_buf, BUFSIZE-1, 0);
-        printf("%s",r_buf);
         goto Branch;
       }
+
     }
 
     /* サーバーによる直接入力監視. */
     if( FD_ISSET(0, &readfds) ){
       fgets(s_buf, BUFSIZE, stdin);  // キーボードから文字列を入力する.
       chop_nl(s_buf);
-      create_message(0);
-      create_packet(MESSAGE, s_buf);
-      send_to_others(0);
+      create_message(0);  //[server] message 形式のメッセージ
+      create_packet(MESSAGE, s_buf);  //ヘッダー追加
+      send_to_others(0);  //サーバー以外(全てのクライアント)に送信.
     }
 
   continue; //通信がなければ以下のBranchには到達しない.
 
   Branch:
     packet = (struct idobata_packet *)r_buf; /* packetがバッファの先頭を指すようにする */
+    printf("packet->header=%s\n", packet->header);
+    printf("packet->data=%s\n", packet->data);
+
     switch( analyze_header(packet->header) ){ /* ヘッダに応じて分岐 */
 
       case HELLO:
         HELLO_process(udp_sock, (struct sockaddr *)&from_adrs, sizeof(from_adrs));
-      break;
+        break;
 
       case JOIN:
-        printf("JOIN\n");
         JOIN_process(sock_detect);  //線形リストのノードにusername情報を追加する.
-        printf("-----------");
         break;
 
       case POST:
+        printf("r_buf = %s\n", r_buf);
         POST_process(sock_detect);  //「POST [username] message」形式の文をほかのすべてのクライアントに送信.
         break;
 
@@ -118,7 +127,6 @@ void idobata_chat_server(int port_number){
         QUIT_process(sock_detect);  //「[username]が退出しました.」というメッセージを送信し,ノードを消す.
     }
   }
-
 }
 
 static int max(int a,int b){
@@ -142,25 +150,37 @@ static char *chop_nl(char *s)   //改行文字を消す
 
 /* 発言者を特定し,[username] messageの形式でパケットを作成し,文字列長を返す. */
 void create_message(int sock_detect){
-  chop_nl( s_buf ); /* messageに改行があれば除く */
-  User_info *temp;
-  for(temp = &server; temp != NULL; temp=temp->next){
+  chop_nl( packet->data ); /* messageに改行があれば除く */
+  User_info *temp = &server;
+  while(1){
     if(temp->sock == sock_detect){
-      sprintf(s_buf, "[%s] %s", temp->username, s_buf);
+      sprintf(s_buf, "[%s] %s", temp->username, packet->data);
+      printf("in create_message s = %s\n", s_buf);
       break;
+    }
+    if(temp->next == NULL){
+      break;
+    }
+    else{
+      temp = temp->next;
     }
   }
 }
 
 static void send_to_others(int my_sock){
   User_info *temp;
-  for(temp=server.next; temp != NULL; temp=temp->next){
-    if(temp->sock == my_sock){
+  temp = &server;
+  while(1){
+    if(temp->sock == my_sock || temp->sock == 0){
       continue;
     }
-//    Send(temp->sock, s_buf, strlen(s_buf),  MSG_NOSIGNAL);
-    Send(temp->sock, s_buf, strlen(s_buf),  SO_NOSIGPIPE);
-
+    Send(temp->sock, s_buf, strlen(s_buf),  MSG_NOSIGNAL);
+    if(temp->next == NULL){
+      break;
+    }
+    else{
+      temp = temp->next;
+    }
   }
 }
 
@@ -193,7 +213,10 @@ void JOIN_process(int sock_detect){
 
 void POST_process(int sock_detect){
   create_message(sock_detect);  //[username] message 形式の文字列を作成.
+  printf("s_buf=%s\n", s_buf);
   create_packet(MESSAGE, s_buf);  //MESG ヘッダーを上で作成した文字列に追加.
+  printf("in POST_process s_buf = %s\n", s_buf);
+  printf("test^^^^^^^^^\n");
   send_to_others(sock_detect);  //発言者以外に送信.
 }
 

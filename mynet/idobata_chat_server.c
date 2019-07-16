@@ -80,6 +80,7 @@ while(1){
     if( FD_ISSET(temp->sock, &readfds) ){
       sock_detect = temp->sock; //検出したソケット番号を保存.
       Recv(sock_detect, r_buf, BUFSIZE-1, 0);
+      printf("%s",r_buf);
       goto Branch;
     }
   }
@@ -104,6 +105,7 @@ Branch:
     break;
 
     case JOIN:
+    printf("JOIN\n");
     JOIN_process(sock_detect);  //線形リストのノードにusername情報を追加する.
     printf("-----------");
     break;
@@ -156,7 +158,9 @@ static void send_to_others(int my_sock){
     if(temp->sock == my_sock){
       continue;
     }
-    Send(temp->sock, s_buf, strlen(s_buf),  MSG_NOSIGNAL);
+//    Send(temp->sock, s_buf, strlen(s_buf),  MSG_NOSIGNAL);
+    Send(temp->sock, s_buf, strlen(s_buf),  SO_NOSIGPIPE);
+
   }
 }
 

@@ -47,7 +47,7 @@ void create_packet(int type, char *message );
 
 /* メッセージ情報管理 */
 struct  idobata_packet{
-  char header[4];   /* パケットのヘッダ部(4バイト) */
+  char header[5];   /* パケットのヘッダ部(4バイト) */
   char sep;         /* セパレータ(空白、またはゼロ) */
   char data[];      /* データ部分(メッセージ本体) */
 };
